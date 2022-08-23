@@ -1,47 +1,57 @@
-//index.js
-const express = require("express");
-const app = express();
-const PORT = 4000;
-
-//New imports
-const http = require("http").Server(app);
-const cors = require("cors");
-
-app.use(cors());
-
-const socketIO = require("socket.io")(http, {
+const express = require("express")
+const app = express()
+const cors = require("cors")
+const http = require('http').Server(app);
+const PORT = 4000
+const socketIO = require('socket.io')(http, {
   cors: {
-    origin: "http://localhost:3000",
-  },
+    origin: "http://localhost:3000"
+  }
 });
+const fs = require('fs');
+//Gets the messages.json file and parse the file into JavaScript object
+const rawData = fs.readFileSync('messages.json');
+const messagesData = JSON.parse(rawData);
 
-let users = [];
+app.use(cors())
+let users = []
 
-socketIO.on("connection", (socket) => {
-  console.log(`⚡: ${socket.id} user just connected!`);
-  socket.on('message', (data) => {
-    socketIO.emit('messageResponse', data);
-  });
+socketIO.on('connection', (socket) => {
+  console.log(`⚡: ${socket.id} user just connected!`)
+  socket.on("message", data => {
+    console.log(data)
+    socketIO.emit("messageResponse", data)
+  })
 
-  socket.on("typing", (data) => socket.broadcast.emit("typingResponse", data));
+  socket.on("typing", data => (
+    socket.broadcast.emit("typingResponse", data)
+  ))
 
-  socket.on('newUser', (data) => {
-    users.push(data);
-    socketIO.emit('newUserResponse', users);
-  });
+  socket.on("newUser", data => {
+    users.push(data)
+    socketIO.emit("newUserResponse", users)
+  })
 
   socket.on('disconnect', () => {
     console.log('🔥: A user disconnected');
-    users = users.filter((user) => user.socketID !== socket.id);
-    socketIO.emit('newUserResponse', users);
-    socket.disconnect();
+    users = users.filter(user => user.socketID !== socket.id)
+    socketIO.emit("newUserResponse", users)
+    socket.disconnect()
   });
+
+  socket.on("message", data => {
+    messagesData["messages"].push(data)
+    const stringData = JSON.stringify(messagesData, null, 2)
+    fs.writeFile("messages.json", stringData, (err) => {
+      console.error(err)
+    })
+    socketIO.emit("messageResponse", data)
+  })
+
 });
 
-app.get("/api", (req, res) => {
-  res.json({
-    message: "Hello world",
-  });
+app.get('/api', (req, res) => {
+  res.json(messagesData);
 });
 
 http.listen(PORT, () => {
